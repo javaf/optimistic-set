@@ -31,13 +31,13 @@ import java.util.concurrent.atomic.*;
 // pipelining occurs even if they want to modify
 // completely different parts of the list.
 
-class FineSet<T> extends AbstractSet<T> {
+class OptimisticSet<T> extends AbstractSet<T> {
   final AtomicInteger size;
   final Node<T> head;
   // size: number of items in set
   // head: points to begin of nodes in set
 
-  public FineSet() {
+  public OptimisticSet() {
     size = new AtomicInteger(0);
     head = new Node<>(null, Integer.MIN_VALUE);
     head.next = new Node<>(null, Integer.MAX_VALUE);
