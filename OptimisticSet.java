@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.function.*;
 import java.util.concurrent.atomic.*;
 
 // Fine Set is a collection of unique elements
@@ -50,13 +51,11 @@ class OptimisticSet<T> extends AbstractSet<T> {
   // 5. Unlock node pairs locked by find.
   @Override
   public boolean add(T v) {
-    Node<T> x = new Node<>(v);    // 1
-    Node<T> p = findNode(x.key);  // 2
-    Node<T> q = p.next;           // 2
-    boolean done = addNode(p, x); // 3
-    if (done) size.incrementAndGet(); // 4
-    unlockPair(p, q); // 5
-    return done;
+    Node<T> x = new Node<>(v);
+    if (!test(x.key, p -> addNode(p, x)))
+      return false;
+    size.incrementAndGet(); // 4
+    return true;
   }
 
   // 1. Find node after which to remove.
@@ -66,12 +65,10 @@ class OptimisticSet<T> extends AbstractSet<T> {
   @Override
   public boolean remove(Object v) {
     int k = v.hashCode();
-    Node<T> p = findNode(k); // 1
-    Node<T> q = p.next;      // 1
-    boolean done = removeNode(p, k);  // 2
-    if (done) size.decrementAndGet(); // 3
-    unlockPair(p, q); // 4
-    return done;
+    if (!test(k, p -> removeNode(p, k)))
+      return false;
+    size.decrementAndGet(); // 3
+    return true;
   }
 
   // 1. Find node previous to search key.
@@ -80,11 +77,7 @@ class OptimisticSet<T> extends AbstractSet<T> {
   @Override
   public boolean contains(Object v) {
     int k = v.hashCode();
-    Node<T> p = findNode(k);  // 1
-    Node<T> q = p.next;       // 1
-    boolean has = q.key == k; // 2
-    unlockPair(p, q); // 3
-    return has;
+    return test(k, p -> p.next.key == k);
   }
 
   // 1. Check if already exists.
@@ -106,15 +99,35 @@ class OptimisticSet<T> extends AbstractSet<T> {
     return true;
   }
 
+  public boolean test(int k, Predicate<Node<T>> fn) {
+    boolean okay = false;
+    boolean done = false;
+    do {
+      Node<T> p = findNode(k);
+      Node<T> q = p.next;
+      okay = validate(p, q);
+      done = okay && fn.test(p);
+      unlockPair(p, q);
+    } while (!okay);
+    return done;
+  }
+
   // 1. Lock first node pair.
   // 2. As long as key too low:
   // 3. Traverse in hand-holding fashion.
   private Node<T> findNode(int k) {
     Node<T> p = head;
-    lockPair(p); // 1
     while (p.next.key < k) // 2
-      p = nextNode(p);     // 3
+      p = p.next;          // 3
+    lockPair(p);
     return p;
+  }
+
+  private boolean validate(Node<T> p, Node<T> q) {
+    Node<T> x = head;
+    while (x.key < p.key)
+      x = x.next;
+    return x == p && p.next == q;
   }
   
   // 1. Lock 1st node.
@@ -131,26 +144,14 @@ class OptimisticSet<T> extends AbstractSet<T> {
     p.unlock(); // 2
   }
 
-  // 1. Unlock 1st node.
-  // 2. Shift to next node.
-  // 3. Lock 3rd node.
-  private Node<T> nextNode(Node<T> p) {
-    p.unlock();    // 1
-    p = p.next;    // 2
-    p.next.lock(); // 3
-    return p;
-  }
-
   @Override
   public Iterator<T> iterator() {
     Collection<T> a = new ArrayList<>();
     Node<T> p = head;
-    lockPair(p);
     while (p.next.next != null) {
       a.add(p.next.value);
-      p = nextNode(p);
+      p = p.next;
     }
-    unlockPair(p, p.next);
     return a.iterator();
   }
 
