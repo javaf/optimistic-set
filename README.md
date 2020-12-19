@@ -28,6 +28,11 @@ be stacked behind each other. This forced
 pipelining occurs even if they want to modify
 completely different parts of the list.
 
+> **Course**: [Concurrent Data Structures], Monsoon 2020\
+> **Taught by**: Prof. Govindarajulu Regeti
+
+[Concurrent Data Structures]: https://github.com/iiithf/concurrent-data-structures
+
 ```java
 add():
 1. Create new node beforehand.
